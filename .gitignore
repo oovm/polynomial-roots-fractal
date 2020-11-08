@@ -12,3 +12,6 @@ target/**/*
 Cargo.lock
 *.nb
 *.wxf
+
+*.7z
+*.gif
