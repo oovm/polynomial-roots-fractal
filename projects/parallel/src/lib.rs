@@ -1,5 +1,5 @@
+mod commands;
 mod db;
 mod helpers;
 
-pub use crate::helpers::*;
-pub use crate::db::*;
+pub use crate::{commands::App, db::*, helpers::*};

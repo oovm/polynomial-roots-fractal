@@ -1,22 +1,20 @@
+use clap::Parser;
 use itertools::Itertools;
 use nalgebra::{Complex, DMatrix};
+use polynomial_roots::{copy_vec_ref, polynomial_eigenvalues, App, PolynomialRootsDatabase};
+use std::{fs::File, io::Write, path::Path};
 use wolfram_wxf::{ToWolfram, WolframValue};
-use std::fs::File;
-use std::io::Write;
-use std::path::Path;
-use polynomial_roots::{copy_vec_ref, polynomial_eigenvalues, PolynomialRootsDatabase};
 // use rayon::prelude::*;
 
+fn main() {
+    App::parse().run().unwrap();
 
-
-
-fn main() -> std::io::Result<()>  {
-    let root = PolynomialRootsDatabase::new(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
-
-    for rank in 2..=20 {
-        root.littlewood_table(rank)?.evaluate()?
-    }
-    Ok(())
+    // let root = PolynomialRootsDatabase::new(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+    //
+    // for rank in 2..=20 {
+    //     root.littlewood_table(rank)?.evaluate()?
+    // }
+    // Ok(())
 }
 
 #[test]
@@ -31,9 +29,6 @@ fn polynomial_roots_export(rank: usize) -> std::io::Result<()> {
     Ok(())
 }
 
-
-
-
 pub fn polynomial_roots(rank: usize) -> Vec<WolframValue> {
     assert!(rank > 1);
     // let tp: Vec<Vec<f32>> = (0..2).map(|_| [-1.0f32, 1.0f32].into_iter()).multi_cartesian_product().collect_vec();
@@ -42,17 +37,15 @@ pub fn polynomial_roots(rank: usize) -> Vec<WolframValue> {
     for i in (0..rank).map(|_| [-1.0f32, 1.0f32].iter()).multi_cartesian_product() {
         polynomials.push(copy_vec_ref(i))
     }
-    //println!("{}",polynomials.len());
+    // println!("{}",polynomials.len());
     for i in polynomials.into_iter() {
         for e in polynomial_eigenvalues(i.as_slice()).iter() {
             roots.push(WolframValue::list(vec![e.im.to_wolfram(), e.re.to_wolfram()]))
         }
     }
-    //println!("{}",roots.len());
-    return roots
+    // println!("{}",roots.len());
+    return roots;
 }
-
-
 
 pub fn polynomial_eigenvalues_complex(input: &[f32]) -> DMatrix<Complex<f32>> {
     let dim = input.len();

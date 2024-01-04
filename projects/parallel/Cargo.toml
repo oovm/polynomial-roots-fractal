@@ -15,7 +15,9 @@ itertools = "0.12.0"
 rayon = "1.8.0"
 sled = "0.34.7"
 wolfram_wxf = "0.6.6"
-indicatif = "0.17.7"
+indicatif = { version = "0.17.7", features = ["rayon", "improved_unicode"] }
+aberth = "0.0.4"
+clap = { version = "4.4.12", features = ["derive"] }
 
 [dev-dependencies]
 
