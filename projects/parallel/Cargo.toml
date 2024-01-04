@@ -1,0 +1,21 @@
+[package]
+name = "sub_projects"
+publish = false
+version = "0.0.0"
+authors = ["Aster <192607617@qq.com>"]
+description = "..."
+repository = "..."
+readme = "../../Readme.md"
+license = "MPL-2.0"
+edition = "2018"
+
+[dependencies]
+nalgebra = "0.32.3"
+itertools = "0.12.0"
+rayon = "1.5"
+wolfram_wxf = "0.6.6"
+
+[dev-dependencies]
+
+[features]
+default = []
