@@ -1,4 +1,5 @@
 use super::*;
+use std::sync::{Arc, Mutex};
 
 pub struct LittlewoodTable {
     order: u32,
@@ -56,27 +57,31 @@ impl LittlewoodTable {
 
     pub fn evaluate_array(&self) -> Vec<WolframValue> {
         let tasks = 2u64.pow(self.order);
+        let buffer = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
         let bar = ProgressBar::new(tasks);
         bar.set_style(ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap());
-        let solutions: Vec<WolframValue> =
-            (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).expect("buffer error")).flatten().collect();
+        (0..tasks).into_par_iter().for_each(|id| self.aberth_solver(id, &bar, buffer.clone()).unwrap());
         bar.finish();
-        solutions
+        Arc::try_unwrap(buffer).unwrap().into_inner().unwrap()
     }
     #[allow(dead_code)]
-    fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
+    fn aberth_solver(
+        &self,
+        task_id: u64,
+        progress: &ProgressBar,
+        buffer: Arc<Mutex<Vec<WolframValue>>>,
+    ) -> Result<(), EvaluateError> {
         let mut solver = AberthSolver::new();
         solver.epsilon = 0.1 / HALF_RESOLUTION;
         solver.max_iterations = 16;
         let equation = make_equation(task_id, self.order as u64);
-        let solutions = solver
-            .find_roots(&equation)
-            .iter()
-            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
-            .collect();
+        let mut lock = buffer.lock().unwrap();
+        for root in solver.find_roots(&equation).iter() {
+            lock.push(WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]));
+        }
         progress.inc(1);
-        Ok(solutions)
+        Ok(())
     }
 
     // slow 10%

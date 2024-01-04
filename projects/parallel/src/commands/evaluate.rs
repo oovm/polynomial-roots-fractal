@@ -1,26 +1,24 @@
 use super::*;
-use crate::EvaluateError;
+use crate::{find_target_dir, EvaluateError};
 use std::{
     fs::{create_dir_all, File},
     io::Write,
 };
-use wolfram_wxf::WolframValue;
+use wolfram_wxf::{ToWolfram, WolframValue};
 
 impl EvaluateCommand {
     pub fn run(self) -> Result<(), EvaluateError> {
-        let target = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let root = PolynomialRootsDatabase::new(target).unwrap();
+        let target = find_target_dir(Path::new(env!("CARGO_MANIFEST_DIR")))?;
+        let root = PolynomialRootsDatabase::new(Path::new(env!("CARGO_MANIFEST_DIR")))?;
         match self.model.as_str() {
             "littlewood" => {
                 let range = self.get_range()?;
-
-                create_dir_all(target.join("PolynomialRoots").join("littlewood")).unwrap();
-
+                create_dir_all(target.join("PolynomialRoots").join("littlewood"))?;
                 for rank in range {
-                    let roots = root.littlewood_table(rank).unwrap().evaluate_array();
+                    let roots = root.littlewood_table(rank)?.evaluate_array();
                     let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", rank));
-                    let mut file = File::create(path).unwrap();
-                    file.write_all(&WolframValue::list(roots).to_compressed()).unwrap();
+                    let mut file = File::create(&path)?;
+                    file.write_all(&WolframValue::list(roots).to_wolfram_bytes())?;
                 }
                 Ok(())
             }
