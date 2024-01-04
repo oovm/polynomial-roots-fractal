@@ -1,4 +1,5 @@
 use super::*;
+use crate::create_progress_bar;
 use std::{
     fs::File,
     io::Write,
@@ -19,6 +20,55 @@ impl PolynomialRootsDatabase {
 }
 
 impl LittlewoodTable {
+    pub fn small_view(&self) {
+        print!("viewing littlewood table {}:\n", self.order);
+        for data in self.table.iter().take(10) {
+            match data {
+                Ok((key, value)) => {
+                    let point = u32::from_be_bytes(key.as_ref().try_into().unwrap());
+                    let [x1, x2, x3, x4, y1, y2, y3, y4] = value.as_ref().try_into().unwrap();
+                    let x = f32::from_be_bytes([*x1, *x2, *x3, *x4]);
+                    let y = f32::from_be_bytes([*y1, *y2, *y3, *y4]);
+                    println!("{}: ({}, {})", point, x, y);
+                }
+                Err(o) => {
+                    eprintln!("Error: {}", o);
+                }
+            }
+        }
+    }
+}
+
+impl LittlewoodTable {
+    pub fn solve_points_on_disk(&self) -> std::io::Result<()> {
+        self.table.clear()?;
+        let tasks = 2u32.pow(self.order);
+        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
+        let bar = create_progress_bar(tasks as u64);
+        (0..tasks).into_par_iter().for_each(|index| {
+            let mut solver = aberth_solver();
+            let equation = make_equation(index as u64, self.order as u64);
+            for root in solver.find_roots(&equation).iter() {
+                self.update_point(index, root.re, root.im).unwrap();
+            }
+            bar.inc(1);
+        });
+        bar.finish();
+        Ok(())
+    }
+    pub fn solve_points_in_memory(&self) -> Result<PathBuf, EvaluateError> {
+        let tasks = 2u64.pow(self.order);
+        // let buffer = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
+        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
+        let bar = create_progress_bar(tasks as u64);
+        let buffer = (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).unwrap()).flatten().collect();
+        let target = find_target_dir(Path::new(env!("CARGO_MANIFEST_DIR")))?;
+        let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", self.order));
+        let mut file = File::create(&path)?;
+        file.write_all(&WolframValue::list(buffer).to_wolfram_bytes())?;
+        bar.finish();
+        Ok(path.canonicalize()?)
+    }
     pub fn update_point(&self, index: u32, x: f32, y: f32) -> std::io::Result<()> {
         if x < 0.0 || y < 0.0 {
             return Ok(());
@@ -28,6 +78,22 @@ impl LittlewoodTable {
         self.table.insert(index, [x1, x2, x3, x4, y1, y2, y3, y4])?;
         Ok(())
     }
+    fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
+        let mut solver = AberthSolver::new();
+        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
+        solver.max_iterations = 16;
+        let solutions = solver
+            .find_roots(&make_equation(task_id, self.order as u64))
+            .iter()
+            .filter(|root| root.re >= 0.0 && root.im >= 0.0)
+            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
+            .collect();
+        progress.inc(1);
+        Ok(solutions)
+    }
+}
+
+impl LittlewoodTable {
     pub fn update_pixel(&self, x: f32, y: f32) -> std::io::Result<()> {
         if x < 0.0 || y < 0.0 {
             return Ok(());
@@ -43,39 +109,11 @@ impl LittlewoodTable {
         self.table.insert(point, counter)?;
         Ok(())
     }
-    pub fn evaluate_points_on_disk(&self) -> std::io::Result<()> {
-        self.table.clear()?;
-        let tasks = 2u32.pow(self.order);
-        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
-        let bar = {
-            let bar = ProgressBar::new(tasks.add(1) as u64);
-            bar.set_style(
-                ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap(),
-            );
-            bar
-        };
-        (0..tasks).into_par_iter().for_each(|i| {
-            let mut solver = aberth_solver();
-            let equation = make_equation(i as u64, self.order as u64);
-            for root in solver.find_roots(&equation).iter() {
-                self.update_point(i, root.re, root.im).unwrap();
-            }
-            bar.inc(1);
-        });
-        bar.finish();
-        Ok(())
-    }
     pub fn evaluate_matrix(&self) -> std::io::Result<()> {
         self.table.clear()?;
         let tasks = 2u32.pow(self.order);
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
-        let bar = {
-            let bar = ProgressBar::new(tasks.add(1) as u64);
-            bar.set_style(
-                ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap(),
-            );
-            bar
-        };
+        let bar = create_progress_bar(tasks as u64);
         (0..tasks).into_par_iter().for_each(|i| {
             let mut solver = AberthSolver::new();
             solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
@@ -89,34 +127,6 @@ impl LittlewoodTable {
         });
         bar.finish();
         Ok(())
-    }
-    pub fn evaluate_points_in_memory(&self) -> Result<PathBuf, EvaluateError> {
-        let tasks = 2u64.pow(self.order);
-        // let buffer = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
-        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
-        let bar = ProgressBar::new(tasks);
-        bar.set_style(ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap());
-        let buffer = (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).unwrap()).flatten().collect();
-        let target = find_target_dir(Path::new(env!("CARGO_MANIFEST_DIR")))?;
-        let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", self.order));
-        let mut file = File::create(&path)?;
-        file.write_all(&WolframValue::list(buffer).to_wolfram_bytes())?;
-        bar.finish();
-        Ok(path.canonicalize()?)
-    }
-    #[allow(dead_code)]
-    fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
-        let mut solver = AberthSolver::new();
-        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-        solver.max_iterations = 16;
-        let solutions = solver
-            .find_roots(&make_equation(task_id, self.order as u64))
-            .iter()
-            .filter(|root| root.re >= 0.0 && root.im >= 0.0)
-            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
-            .collect();
-        progress.inc(1);
-        Ok(solutions)
     }
     #[allow(dead_code)]
     fn aberth_solver_buffer(
