@@ -11,7 +11,7 @@ use wolfram_wxf::{ToWolfram, WolframValue};
 mod littlewood;
 mod point;
 
-const HALF_RESOLUTION: f32 = 300000.0 / 2.0;
+const MAX_RESOLUTION: u32 = 2u32.pow(15);
 
 pub struct PolynomialRootsDatabase {
     database: Db,

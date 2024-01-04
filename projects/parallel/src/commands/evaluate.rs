@@ -15,10 +15,7 @@ impl EvaluateCommand {
                 let range = self.get_range()?;
                 create_dir_all(target.join("PolynomialRoots").join("littlewood"))?;
                 for rank in range {
-                    let roots = root.littlewood_table(rank)?.evaluate_array();
-                    let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", rank));
-                    let mut file = File::create(&path)?;
-                    file.write_all(&WolframValue::list(roots).to_wolfram_bytes())?;
+                    root.littlewood_table(rank)?.evaluate_points_in_memory()?;
                 }
                 Ok(())
             }
