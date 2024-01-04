@@ -1,4 +1,6 @@
-use sled::InlineArray;
+use std::iter::FromIterator;
+use super::*;
+
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default)]
@@ -23,8 +25,8 @@ impl AsRef<[u8]> for Point {
     }
 }
 
-impl Into<InlineArray> for Counter {
-    fn into(self) -> InlineArray {
-        InlineArray::from(&self.n.to_le_bytes())
+impl Into<IVec> for Counter {
+    fn into(self) -> IVec {
+        IVec::from_iter(self.n.to_le_bytes())
     }
 }

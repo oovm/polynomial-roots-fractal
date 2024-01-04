@@ -1,5 +1,5 @@
 [package]
-name = "sub_projects"
+name = "polynomial-roots"
 publish = false
 version = "0.0.0"
 authors = ["Aster <192607617@qq.com>"]
@@ -13,8 +13,9 @@ edition = "2018"
 nalgebra = "0.32.3"
 itertools = "0.12.0"
 rayon = "1.8.0"
-sled = "1.0.0-alpha.120"
+sled = "0.34.7"
 wolfram_wxf = "0.6.6"
+indicatif = "0.17.7"
 
 [dev-dependencies]
 

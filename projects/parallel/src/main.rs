@@ -1,16 +1,20 @@
 use itertools::Itertools;
-use nalgebra::{Complex, DMatrix, U1, MatrixMN, Dynamic};
+use nalgebra::{Complex, DMatrix};
 use wolfram_wxf::{ToWolfram, WolframValue};
 use std::fs::File;
 use std::io::Write;
+use std::path::Path;
+use polynomial_roots::{copy_vec_ref, polynomial_eigenvalues, PolynomialRootsDatabase};
 // use rayon::prelude::*;
 
 
 
 
 fn main() -> std::io::Result<()>  {
-    for r in 2..=12 {
-        polynomial_roots_export(r)?
+    let root = PolynomialRootsDatabase::new(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
+
+    for rank in 2..=20 {
+        root.littlewood_table(rank)?.evaluate()?
     }
     Ok(())
 }
@@ -27,9 +31,8 @@ fn polynomial_roots_export(rank: usize) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn copy_vec_ref<T: Copy>(vec: Vec<&T>) -> Vec<T> {
-    vec.into_iter().copied().collect()
-}
+
+
 
 pub fn polynomial_roots(rank: usize) -> Vec<WolframValue> {
     assert!(rank > 1);
@@ -49,21 +52,7 @@ pub fn polynomial_roots(rank: usize) -> Vec<WolframValue> {
     return roots
 }
 
-pub fn polynomial_eigenvalues(input: &[f32]) -> MatrixMN<Complex<f32>,Dynamic ,U1>  {
-    let dim = input.len();
-    let mat: DMatrix<f32> = DMatrix::from_fn(dim, dim, |r, c| {
-        if r == 0 {
-            -input[c]
-        }
-        else if r == c + 1 {
-            1.0
-        }
-        else {
-            0.0
-        }
-    });
-    mat.complex_eigenvalues()
-}
+
 
 pub fn polynomial_eigenvalues_complex(input: &[f32]) -> DMatrix<Complex<f32>> {
     let dim = input.len();
