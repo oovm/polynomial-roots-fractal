@@ -1,5 +1,6 @@
 use super::*;
 use crate::create_progress_bar;
+use sled::Batch;
 use std::{
     fs::File,
     io::Write,
@@ -22,20 +23,24 @@ impl PolynomialRootsDatabase {
 impl LittlewoodTable {
     pub fn small_view(&self) {
         print!("viewing littlewood table {}:\n", self.order);
-        for data in self.table.iter().take(10) {
+        let mut max_x = 0.0f32;
+        let mut max_y = 0.0f32;
+        for data in self.table.iter().values() {
             match data {
-                Ok((key, value)) => {
-                    let point = u32::from_be_bytes(key.as_ref().try_into().unwrap());
+                Ok(value) => {
+                    // let point = u32::from_be_bytes(key.as_ref().try_into().unwrap());
                     let [x1, x2, x3, x4, y1, y2, y3, y4] = value.as_ref().try_into().unwrap();
-                    let x = f32::from_be_bytes([*x1, *x2, *x3, *x4]);
-                    let y = f32::from_be_bytes([*y1, *y2, *y3, *y4]);
-                    println!("{}: ({}, {})", point, x, y);
+                    let x = f32::from_be_bytes([x1, x2, x3, x4]);
+                    let y = f32::from_be_bytes([y1, y2, y3, y4]);
+                    max_x = max_x.max(x);
+                    max_y = max_y.max(y);
                 }
                 Err(o) => {
-                    eprintln!("Error: {}", o);
+                    eprintln!("Fatal error: {}", o);
                 }
             }
         }
+        println!("max_x: {}, max_y: {}", max_x, max_y);
     }
 }
 
@@ -46,11 +51,7 @@ impl LittlewoodTable {
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
         let bar = create_progress_bar(tasks as u64);
         (0..tasks).into_par_iter().for_each(|index| {
-            let mut solver = aberth_solver();
-            let equation = make_equation(index as u64, self.order as u64);
-            for root in solver.find_roots(&equation).iter() {
-                self.update_point(index, root.re, root.im).unwrap();
-            }
+            self.update_point(index).unwrap();
             bar.inc(1);
         });
         bar.finish();
@@ -69,13 +70,19 @@ impl LittlewoodTable {
         bar.finish();
         Ok(path.canonicalize()?)
     }
-    pub fn update_point(&self, index: u32, x: f32, y: f32) -> std::io::Result<()> {
-        if x < 0.0 || y < 0.0 {
-            return Ok(());
+    pub fn update_point(&self, index: u32) -> std::io::Result<()> {
+        let equation = make_equation(index as u64, self.order as u64);
+        let mut solver = aberth_solver();
+        let mut batch = Batch::default();
+        for root in solver.find_roots(&equation).iter() {
+            if root.re < 0.0 || root.im < 0.0 {
+                continue;
+            }
+            let [x1, x2, x3, x4] = root.re.to_be_bytes();
+            let [y1, y2, y3, y4] = root.im.to_be_bytes();
+            batch.insert(&index.to_be_bytes(), &[x1, x2, x3, x4, y1, y2, y3, y4])
         }
-        let [x1, x2, x3, x4] = x.to_be_bytes();
-        let [y1, y2, y3, y4] = y.to_be_bytes();
-        self.table.insert(index, [x1, x2, x3, x4, y1, y2, y3, y4])?;
+        self.table.apply_batch(batch)?;
         Ok(())
     }
     fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {

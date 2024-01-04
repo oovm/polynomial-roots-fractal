@@ -15,7 +15,7 @@ impl DatabaseCommand {
                 let range = read_range(&self.orders)?;
                 create_dir_all(target.join("PolynomialRoots").join("littlewood"))?;
                 for rank in range {
-                    root.littlewood_table(rank)?.small_view()?;
+                    root.littlewood_table(rank)?.small_view();
                 }
                 Ok(())
             }

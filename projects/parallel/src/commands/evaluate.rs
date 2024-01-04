@@ -15,7 +15,7 @@ impl EvaluateCommand {
                 let range = read_range(&self.orders)?;
                 create_dir_all(target.join("PolynomialRoots").join("littlewood"))?;
                 for rank in range {
-                    root.littlewood_table(rank)?.solve_points_in_memory()?;
+                    root.littlewood_table(rank)?.solve_points_on_disk()?;
                 }
                 Ok(())
             }
