@@ -7,7 +7,7 @@ impl EvaluateCommand {
             "littlewood" => {
                 let range = self.get_range()?;
                 for rank in range {
-                    root.littlewood_table(rank).unwrap().evaluate().unwrap()
+                    root.littlewood_table(rank).unwrap().evaluate_array().unwrap();
                 }
                 Ok(())
             }

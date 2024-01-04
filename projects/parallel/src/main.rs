@@ -1,20 +1,14 @@
 use clap::Parser;
 use itertools::Itertools;
 use nalgebra::{Complex, DMatrix};
-use polynomial_roots::{copy_vec_ref, polynomial_eigenvalues, App, PolynomialRootsDatabase};
-use std::{fs::File, io::Write, path::Path};
+use polynomial_roots::{copy_vec_ref, polynomial_eigenvalues, App};
+use std::{fs::File, io::Write};
 use wolfram_wxf::{ToWolfram, WolframValue};
 // use rayon::prelude::*;
 
-fn main() {
+fn main() -> std::io::Result<()> {
     App::parse().run().unwrap();
-
-    // let root = PolynomialRootsDatabase::new(Path::new(env!("CARGO_MANIFEST_DIR"))).unwrap();
-    //
-    // for rank in 2..=20 {
-    //     root.littlewood_table(rank)?.evaluate()?
-    // }
-    // Ok(())
+    Ok(())
 }
 
 #[test]

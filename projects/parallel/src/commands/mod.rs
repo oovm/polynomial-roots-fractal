@@ -1,9 +1,6 @@
 use crate::PolynomialRootsDatabase;
-use clap::{builder::ValueRange, Args, Parser, Subcommand, ValueEnum};
-use std::{
-    ops::{Range, RangeInclusive},
-    path::Path,
-};
+use clap::{Args, Parser, Subcommand};
+use std::{ops::RangeInclusive, path::Path};
 
 mod evaluate;
 

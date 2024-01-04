@@ -1,6 +1,9 @@
 use super::*;
-use aberth::AberthSolver;
-use std::ops::Add;
+use aberth::{AberthSolver, Complex};
+use std::{
+    ops::Add,
+    sync::{Arc, Mutex},
+};
 
 pub struct LittlewoodTable {
     rank: u32,
@@ -23,10 +26,7 @@ impl LittlewoodTable {
         let y = (y * HALF_RESOLUTION) as u32;
         let point = Point { x, y };
         let mut counter = match self.table.get(&point)? {
-            Some(s) => {
-                // s.make_mut()?
-                Counter { n: u32::from_le_bytes(s.as_ref().try_into().expect("size mismatch")) }
-            }
+            Some(s) => Counter::from(s),
             None => Counter::default(),
         };
         counter.n += 1;
@@ -37,9 +37,8 @@ impl LittlewoodTable {
         self.table.clear()?;
         let tasks = 2u32.pow(self.rank);
         println!("Calculating littlewood rank {} with {} tasks", self.rank, tasks);
-
         let bar = {
-            let bar = ProgressBar::new(tasks as u64);
+            let bar = ProgressBar::new(tasks.add(1) as u64);
             bar.set_style(
                 ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap(),
             );
@@ -58,6 +57,32 @@ impl LittlewoodTable {
         });
         bar.finish();
         Ok(())
+    }
+
+    pub fn evaluate_array(&self) -> std::io::Result<Vec<Complex<f32>>> {
+        let tasks = 2u32.pow(self.rank);
+        let outputs = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
+        println!("Calculating littlewood rank {} with {} tasks", self.rank, tasks);
+        let bar = {
+            let bar = ProgressBar::new(tasks.add(1) as u64);
+            bar.set_style(
+                ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap(),
+            );
+            bar
+        };
+        (0..tasks).into_par_iter().for_each(|i| {
+            let mut solver = AberthSolver::new();
+            solver.epsilon = 0.01 / HALF_RESOLUTION;
+            solver.max_iterations = 16;
+            let equation = make_equation(i as u64, self.rank as u64);
+            // let roots = polynomial_eigenvalues(&equation);
+            for root in solver.find_roots(&equation).into_iter() {
+                outputs.lock().as_deref_mut().unwrap().push(root.clone());
+            }
+            bar.inc(1);
+        });
+        bar.finish();
+        Ok(vec![])
     }
 }
 

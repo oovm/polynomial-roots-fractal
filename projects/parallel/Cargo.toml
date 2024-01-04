@@ -10,6 +10,7 @@ license = "MPL-2.0"
 edition = "2018"
 
 [dependencies]
+ndarray = "0.15.6"
 nalgebra = "0.32.3"
 itertools = "0.12.0"
 rayon = "1.8.0"

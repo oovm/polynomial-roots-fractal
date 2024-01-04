@@ -1,1 +1,2 @@
-
+#[test]
+fn test() {}

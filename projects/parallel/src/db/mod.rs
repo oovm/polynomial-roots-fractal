@@ -1,10 +1,9 @@
 use self::point::{Counter, Point};
-use crate::{find_target_dir, polynomial_eigenvalues};
+use crate::find_target_dir;
 use indicatif::{ProgressBar, ProgressStyle};
-use itertools::Itertools;
-use rayon::iter::{plumbing::Folder, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sled::{Db, IVec};
-use std::{convert::TryInto, path::Path};
+use std::{convert::TryInto, iter::FromIterator, path::Path};
 
 mod littlewood;
 mod point;
