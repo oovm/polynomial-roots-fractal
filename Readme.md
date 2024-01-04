@@ -11,11 +11,11 @@ For roots of 24th degree polynomial there are 402,653,184 roots, and it takes 37
 
 ### Roots of 20th degree polynomial with avocado colors
 
-![](./projects/roots17-20/roots-avocado.png)
+![](./projects/image/roots17-20/roots-avocado.png)
 
 ### Roots of 20th degree polynomial with gray tones
 
-![](./projects/roots17-20/roots-gray-tones.png)
+![](./projects/image/roots17-20/roots-gray-tones.png)
 
 ## Reference
 
