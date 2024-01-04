@@ -1,4 +1,4 @@
-use crate::PolynomialRootsDatabase;
+use crate::{EvaluateError, PolynomialRootsDatabase};
 use clap::{Args, Parser, Subcommand};
 use std::{ops::RangeInclusive, path::Path};
 
@@ -12,7 +12,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn run(self) -> Result<(), String> {
+    pub fn run(self) -> Result<(), EvaluateError> {
         match self.command {
             AppCommand::Evaluate(cmd) => cmd.run(),
         }

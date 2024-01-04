@@ -1,9 +1,12 @@
 use self::point::{Counter, Point};
-use crate::find_target_dir;
+use crate::{find_target_dir, EvaluateError};
+use aberth::{AberthSolver, Complex};
 use indicatif::{ProgressBar, ProgressStyle};
+use nalgebra::{DMatrix, Dyn, OVector};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sled::{Db, IVec};
-use std::{convert::TryInto, iter::FromIterator, path::Path};
+use std::{convert::TryInto, iter::FromIterator, ops::Add, path::Path};
+use wolfram_wxf::{ToWolfram, WolframValue};
 
 mod littlewood;
 mod point;

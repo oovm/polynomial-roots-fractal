@@ -1,19 +1,14 @@
 use super::*;
-use aberth::{AberthSolver, Complex};
-use std::{
-    ops::Add,
-    sync::{Arc, Mutex},
-};
 
 pub struct LittlewoodTable {
-    rank: u32,
+    order: u32,
     table: sled::Tree,
 }
 
 impl PolynomialRootsDatabase {
     pub fn littlewood_table(&self, rank: u32) -> std::io::Result<LittlewoodTable> {
         let tb: sled::Tree = self.database.open_tree(format!("Littlewood-{}", rank).as_bytes())?;
-        Ok(LittlewoodTable { rank, table: tb })
+        Ok(LittlewoodTable { order: rank, table: tb })
     }
 }
 
@@ -35,8 +30,8 @@ impl LittlewoodTable {
     }
     pub fn evaluate(&self) -> std::io::Result<()> {
         self.table.clear()?;
-        let tasks = 2u32.pow(self.rank);
-        println!("Calculating littlewood rank {} with {} tasks", self.rank, tasks);
+        let tasks = 2u32.pow(self.order);
+        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
         let bar = {
             let bar = ProgressBar::new(tasks.add(1) as u64);
             bar.set_style(
@@ -48,7 +43,7 @@ impl LittlewoodTable {
             let mut solver = AberthSolver::new();
             solver.epsilon = 0.01 / HALF_RESOLUTION;
             solver.max_iterations = 16;
-            let equation = make_equation(i as u64, self.rank as u64);
+            let equation = make_equation(i as u64, self.order as u64);
             // let roots = polynomial_eigenvalues(&equation);
             for root in solver.find_roots(&equation).iter() {
                 self.update(root.re, root.im).unwrap();
@@ -59,30 +54,41 @@ impl LittlewoodTable {
         Ok(())
     }
 
-    pub fn evaluate_array(&self) -> std::io::Result<Vec<Complex<f32>>> {
-        let tasks = 2u32.pow(self.rank);
-        let outputs = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
-        println!("Calculating littlewood rank {} with {} tasks", self.rank, tasks);
-        let bar = {
-            let bar = ProgressBar::new(tasks.add(1) as u64);
-            bar.set_style(
-                ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap(),
-            );
-            bar
-        };
-        (0..tasks).into_par_iter().for_each(|i| {
-            let mut solver = AberthSolver::new();
-            solver.epsilon = 0.01 / HALF_RESOLUTION;
-            solver.max_iterations = 16;
-            let equation = make_equation(i as u64, self.rank as u64);
-            // let roots = polynomial_eigenvalues(&equation);
-            for root in solver.find_roots(&equation).into_iter() {
-                outputs.lock().as_deref_mut().unwrap().push(root.clone());
-            }
-            bar.inc(1);
-        });
+    pub fn evaluate_array(&self) -> Vec<WolframValue> {
+        let tasks = 2u64.pow(self.order);
+        println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
+        let bar = ProgressBar::new(tasks);
+        bar.set_style(ProgressStyle::with_template("{bar:100.cyan/blue} [Time {elapsed_precise}, ETA {eta_precise}]").unwrap());
+        let solutions: Vec<WolframValue> =
+            (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).expect("buffer error")).flatten().collect();
         bar.finish();
-        Ok(vec![])
+        solutions
+    }
+    #[allow(dead_code)]
+    fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
+        let mut solver = AberthSolver::new();
+        solver.epsilon = 0.1 / HALF_RESOLUTION;
+        solver.max_iterations = 16;
+        let equation = make_equation(task_id, self.order as u64);
+        let solutions = solver
+            .find_roots(&equation)
+            .iter()
+            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
+            .collect();
+        progress.inc(1);
+        Ok(solutions)
+    }
+
+    // slow 10%
+    #[allow(dead_code)]
+    fn eigen_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
+        let equation = make_equation(task_id, self.order as u64);
+        let solutions = polynomial_eigenvalues(&equation)
+            .iter()
+            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
+            .collect();
+        progress.inc(1);
+        Ok(solutions)
     }
 }
 
@@ -95,4 +101,20 @@ fn make_equation(index: u64, order: u64) -> Vec<f32> {
         result.push(fill);
     }
     result
+}
+
+fn polynomial_eigenvalues(input: &[f32]) -> OVector<Complex<f32>, Dyn> {
+    let dim = input.len();
+    let mat: DMatrix<f32> = DMatrix::from_fn(dim, dim, |r, c| {
+        if r == 0 {
+            -input[c]
+        }
+        else if r == c + 1 {
+            1.0
+        }
+        else {
+            0.0
+        }
+    });
+    mat.complex_eigenvalues()
 }

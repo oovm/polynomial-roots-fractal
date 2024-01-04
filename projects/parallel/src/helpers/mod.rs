@@ -1,36 +1,21 @@
-use std::fs::create_dir;
-use std::path::{Path, PathBuf};
-use nalgebra::{Complex, DMatrix, Dyn, OVector};
+use std::{
+    fs::create_dir,
+    path::{Path, PathBuf},
+};
 
 pub fn copy_vec_ref<T: Copy>(vec: Vec<&T>) -> Vec<T> {
     vec.into_iter().copied().collect()
-}
-
-pub fn polynomial_eigenvalues(input: &[f32]) -> OVector<Complex<f32>, Dyn>  {
-    let dim = input.len();
-    let mat: DMatrix<f32> = DMatrix::from_fn(dim, dim, |r, c| {
-        if r == 0 {
-            -input[c]
-        }
-        else if r == c + 1 {
-            1.0
-        }
-        else {
-            0.0
-        }
-    });
-    mat.complex_eigenvalues()
 }
 
 pub fn find_target_dir<P: AsRef<Path>>(here: P) -> std::io::Result<PathBuf> {
     let here = here.as_ref();
     let here = if here.is_file() {
         match here.parent() {
-            Some(s) => {s.to_path_buf()}
-            None => panic!("No parent directory found")
+            Some(s) => s.to_path_buf(),
+            None => panic!("No parent directory found"),
         }
-
-    } else {
+    }
+    else {
         here.to_path_buf()
     };
     let mut parent = here.clone();
@@ -43,7 +28,7 @@ pub fn find_target_dir<P: AsRef<Path>>(here: P) -> std::io::Result<PathBuf> {
         }
         parent = match parent.parent() {
             Some(parent) => parent.to_path_buf(),
-            None => break
+            None => break,
         }
     }
     let new = here.join("target");
