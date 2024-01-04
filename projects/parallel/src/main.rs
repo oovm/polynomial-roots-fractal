@@ -6,6 +6,8 @@ use std::io::Write;
 // use rayon::prelude::*;
 
 
+
+
 fn main() -> std::io::Result<()>  {
     for r in 2..=12 {
         polynomial_roots_export(r)?
