@@ -1,7 +1,6 @@
-use crate::{EvaluateError, PolynomialRootsDatabase};
+use crate::{find_target_dir, read_range, EvaluateError, PolynomialRootsDatabase};
 use clap::{Args, Parser, Subcommand};
-use std::{ops::RangeInclusive, path::Path};
-
+use std::{fs::create_dir_all, path::Path};
 mod database;
 mod evaluate;
 

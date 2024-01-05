@@ -1,10 +1,4 @@
 use super::*;
-use crate::{find_target_dir, read_range, EvaluateError};
-use std::{
-    fs::{create_dir_all, File},
-    io::Write,
-};
-use wolfram_wxf::{ToWolfram, WolframValue};
 
 impl EvaluateCommand {
     pub fn run(self) -> Result<(), EvaluateError> {
@@ -15,7 +9,7 @@ impl EvaluateCommand {
                 let range = read_range(&self.orders)?;
                 create_dir_all(target.join("PolynomialRoots").join("littlewood"))?;
                 for rank in range {
-                    root.littlewood_table(rank)?.solve_points_on_disk()?;
+                    root.littlewood_table(rank)?.solve_points_in_memory()?;
                 }
                 Ok(())
             }

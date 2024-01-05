@@ -1,11 +1,19 @@
 use self::point::{Counter, Point};
-use crate::{find_target_dir, EvaluateError};
+use crate::{create_progress_bar, find_target_dir, EvaluateError};
 use aberth::{AberthSolver, Complex};
-use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::ProgressBar;
 use nalgebra::{DMatrix, Dyn, OVector};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use sled::{Db, IVec};
-use std::{convert::TryInto, iter::FromIterator, ops::Add, path::Path};
+use sled::{Batch, Db, IVec};
+use std::{
+    convert::TryInto,
+    fs::File,
+    io::Write,
+    iter::FromIterator,
+    ops::Add,
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+};
 use wolfram_wxf::{ToWolfram, WolframValue};
 
 mod littlewood;

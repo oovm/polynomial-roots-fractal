@@ -1,12 +1,4 @@
 use super::*;
-use crate::create_progress_bar;
-use sled::Batch;
-use std::{
-    fs::File,
-    io::Write,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-};
 
 pub struct LittlewoodTable {
     order: u32,
@@ -32,6 +24,10 @@ impl LittlewoodTable {
                     let [x1, x2, x3, x4, y1, y2, y3, y4] = value.as_ref().try_into().unwrap();
                     let x = f32::from_be_bytes([x1, x2, x3, x4]);
                     let y = f32::from_be_bytes([y1, y2, y3, y4]);
+                    if y < 1.0 / MAX_RESOLUTION as f32 {
+                        continue;
+                    }
+
                     max_x = max_x.max(x);
                     max_y = max_y.max(y);
                 }
@@ -62,11 +58,12 @@ impl LittlewoodTable {
         // let buffer = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
         let bar = create_progress_bar(tasks as u64);
-        let buffer = (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).unwrap()).flatten().collect();
+        let buffer: Vec<WolframValue> =
+            (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).unwrap()).flatten().collect();
         let target = find_target_dir(Path::new(env!("CARGO_MANIFEST_DIR")))?;
         let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", self.order));
         let mut file = File::create(&path)?;
-        file.write_all(&WolframValue::list(buffer).to_wolfram_bytes())?;
+        file.write_all(&buffer.to_wolfram_bytes())?;
         bar.finish();
         Ok(path.canonicalize()?)
     }
@@ -85,6 +82,7 @@ impl LittlewoodTable {
         self.table.apply_batch(batch)?;
         Ok(())
     }
+    #[allow(dead_code)]
     fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
         let mut solver = AberthSolver::new();
         solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
@@ -92,11 +90,29 @@ impl LittlewoodTable {
         let solutions = solver
             .find_roots(&make_equation(task_id, self.order as u64))
             .iter()
-            .filter(|root| root.re >= 0.0 && root.im >= 0.0)
-            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
+            .filter(|root| 0.0 <= root.re && root.re <= 2.0 && 0.0 <= root.im && root.im <= 1.5)
+            .map(|root| WolframValue::list(vec![root.re.to_wolfram(), root.im.to_wolfram()]))
             .collect();
         progress.inc(1);
         Ok(solutions)
+    }
+    #[allow(dead_code)]
+    fn aberth_solver_inplace(
+        &self,
+        task_id: u64,
+        progress: &ProgressBar,
+        buffer: Arc<Mutex<Vec<WolframValue>>>,
+    ) -> Result<(), EvaluateError> {
+        let mut solver = AberthSolver::new();
+        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
+        solver.max_iterations = 16;
+        let equation = make_equation(task_id, self.order as u64);
+        let mut lock = buffer.lock().unwrap();
+        for root in solver.find_roots(&equation).iter() {
+            lock.push(WolframValue::list(vec![root.re.to_wolfram(), root.im.to_wolfram()]));
+        }
+        progress.inc(1);
+        Ok(())
     }
 }
 
@@ -135,24 +151,6 @@ impl LittlewoodTable {
         bar.finish();
         Ok(())
     }
-    #[allow(dead_code)]
-    fn aberth_solver_buffer(
-        &self,
-        task_id: u64,
-        progress: &ProgressBar,
-        buffer: Arc<Mutex<Vec<WolframValue>>>,
-    ) -> Result<(), EvaluateError> {
-        let mut solver = AberthSolver::new();
-        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-        solver.max_iterations = 16;
-        let equation = make_equation(task_id, self.order as u64);
-        let mut lock = buffer.lock().unwrap();
-        for root in solver.find_roots(&equation).iter() {
-            lock.push(WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]));
-        }
-        progress.inc(1);
-        Ok(())
-    }
 
     // slow 10%
     #[allow(dead_code)]
@@ -160,7 +158,7 @@ impl LittlewoodTable {
         let equation = make_equation(task_id, self.order as u64);
         let solutions = polynomial_eigenvalues(&equation)
             .iter()
-            .map(|root| WolframValue::list(vec![root.im.to_wolfram(), root.re.to_wolfram()]))
+            .map(|root| WolframValue::list(vec![root.re.to_wolfram(), root.im.to_wolfram()]))
             .collect();
         progress.inc(1);
         Ok(solutions)
@@ -181,7 +179,7 @@ fn make_equation(index: u64, order: u64) -> Vec<f32> {
 fn aberth_solver() -> AberthSolver<f32> {
     let mut solver = AberthSolver::new();
     solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-    solver.max_iterations = 16;
+    solver.max_iterations = 20;
     solver
 }
 
