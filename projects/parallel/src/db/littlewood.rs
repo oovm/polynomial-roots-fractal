@@ -1,4 +1,5 @@
 use super::*;
+use integer_encoding::VarIntWriter;
 
 pub struct LittlewoodTable {
     order: u32,
@@ -55,15 +56,15 @@ impl LittlewoodTable {
     }
     pub fn solve_points_in_memory(&self) -> Result<PathBuf, EvaluateError> {
         let tasks = 2u64.pow(self.order);
-        // let buffer = Arc::new(Mutex::new(Vec::with_capacity(tasks as usize)));
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
-        let bar = create_progress_bar(tasks as u64);
-        let buffer: Vec<WolframValue> =
-            (0..tasks).into_par_iter().map(|id| self.aberth_solver(id, &bar).unwrap()).flatten().collect();
+        let bar = create_progress_bar(tasks);
         let target = find_target_dir(Path::new(env!("CARGO_MANIFEST_DIR")))?;
         let path = target.join("PolynomialRoots").join("littlewood").join(format!("complex_{}.wxf", self.order));
         let mut file = File::create(&path)?;
-        file.write_all(&buffer.to_wolfram_bytes())?;
+        file.write(&[56, 58, 193, 51, 1])?;
+        let solutions: Vec<_> = (0..tasks).into_par_iter().map(|id| self.aberth_solver2(id, &bar)).flatten().collect();
+        file.write_varint(solutions.len() / 8)?;
+        file.write_all(&solutions)?;
         bar.finish();
         Ok(path.canonicalize()?)
     }
@@ -75,8 +76,8 @@ impl LittlewoodTable {
             if root.re < 0.0 || root.im < 0.0 {
                 continue;
             }
-            let [x1, x2, x3, x4] = root.re.to_be_bytes();
-            let [y1, y2, y3, y4] = root.im.to_be_bytes();
+            let [x1, x2, x3, x4] = (root.re as f32).to_be_bytes();
+            let [y1, y2, y3, y4] = (root.im as f32).to_be_bytes();
             batch.insert(&index.to_be_bytes(), &[x1, x2, x3, x4, y1, y2, y3, y4])
         }
         self.table.apply_batch(batch)?;
@@ -84,10 +85,7 @@ impl LittlewoodTable {
     }
     #[allow(dead_code)]
     fn aberth_solver(&self, task_id: u64, progress: &ProgressBar) -> Result<Vec<WolframValue>, EvaluateError> {
-        let mut solver = AberthSolver::new();
-        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-        solver.max_iterations = 16;
-        let solutions = solver
+        let solutions = aberth_solver()
             .find_roots(&make_equation(task_id, self.order as u64))
             .iter()
             .filter(|root| 0.0 <= root.re && root.re <= 2.0 && 0.0 <= root.im && root.im <= 1.5)
@@ -97,22 +95,19 @@ impl LittlewoodTable {
         Ok(solutions)
     }
     #[allow(dead_code)]
-    fn aberth_solver_inplace(
-        &self,
-        task_id: u64,
-        progress: &ProgressBar,
-        buffer: Arc<Mutex<Vec<WolframValue>>>,
-    ) -> Result<(), EvaluateError> {
-        let mut solver = AberthSolver::new();
-        solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-        solver.max_iterations = 16;
-        let equation = make_equation(task_id, self.order as u64);
-        let mut lock = buffer.lock().unwrap();
-        for root in solver.find_roots(&equation).iter() {
-            lock.push(WolframValue::list(vec![root.re.to_wolfram(), root.im.to_wolfram()]));
-        }
+    fn aberth_solver2(&self, task_id: u64, progress: &ProgressBar) -> Vec<u8> {
         progress.inc(1);
-        Ok(())
+        aberth_solver()
+            .find_roots(&make_equation(task_id, self.order as u64))
+            .into_iter()
+            .filter(|root| 0.0 <= root.re && 0.0 <= root.im)
+            .map(|root| {
+                let [x1, x2, x3, x4] = (root.re as f32).to_le_bytes();
+                let [y1, y2, y3, y4] = (root.im as f32).to_le_bytes();
+                [x1, x2, x3, x4, y1, y2, y3, y4]
+            })
+            .flatten()
+            .collect()
     }
 }
 
@@ -138,13 +133,10 @@ impl LittlewoodTable {
         println!("Calculating littlewood rank {} with {} tasks", self.order, tasks);
         let bar = create_progress_bar(tasks as u64);
         (0..tasks).into_par_iter().for_each(|i| {
-            let mut solver = AberthSolver::new();
-            solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
-            solver.max_iterations = 16;
             let equation = make_equation(i as u64, self.order as u64);
             // let roots = polynomial_eigenvalues(&equation);
-            for root in solver.find_roots(&equation).iter() {
-                self.update_pixel(root.re, root.im).unwrap();
+            for root in aberth_solver().find_roots(&equation).iter() {
+                self.update_pixel(root.re as f32, root.im as f32).unwrap();
             }
             bar.inc(1);
         });
@@ -165,7 +157,7 @@ impl LittlewoodTable {
     }
 }
 
-fn make_equation(index: u64, order: u64) -> Vec<f32> {
+fn make_equation(index: u64, order: u64) -> Vec<f64> {
     let mut result = Vec::with_capacity(order.add(1) as usize);
     result.push(1.0);
     for i in (0..order).rev() {
@@ -176,16 +168,16 @@ fn make_equation(index: u64, order: u64) -> Vec<f32> {
     result
 }
 
-fn aberth_solver() -> AberthSolver<f32> {
+fn aberth_solver() -> AberthSolver<f64> {
     let mut solver = AberthSolver::new();
-    solver.epsilon = 0.1 / MAX_RESOLUTION as f32;
+    solver.epsilon = 0.1 / MAX_RESOLUTION as f64;
     solver.max_iterations = 20;
     solver
 }
 
-fn polynomial_eigenvalues(input: &[f32]) -> OVector<Complex<f32>, Dyn> {
+fn polynomial_eigenvalues(input: &[f64]) -> OVector<Complex<f64>, Dyn> {
     let dim = input.len();
-    let mat: DMatrix<f32> = DMatrix::from_fn(dim, dim, |r, c| {
+    let mat: DMatrix<f64> = DMatrix::from_fn(dim, dim, |r, c| {
         if r == 0 {
             -input[c]
         }

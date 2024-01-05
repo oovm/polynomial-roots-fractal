@@ -15,7 +15,8 @@ nalgebra = "0.32.3"
 itertools = "0.12.0"
 rayon = "1.8.0"
 sled = "0.34.7"
-wolfram_wxf = "0.6.6"
+wolfram_wxf = "0.7.0"
+integer-encoding = "4.0.0"
 indicatif = { version = "0.17.7", features = ["rayon", "improved_unicode"] }
 aberth = "0.0.4"
 clap = { version = "4.4.12", features = ["derive"] }
