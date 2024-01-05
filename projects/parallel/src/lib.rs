@@ -1,3 +1,5 @@
+#![feature(write_all_vectored)]
+
 mod commands;
 mod db;
 mod errors;

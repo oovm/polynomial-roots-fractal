@@ -2,6 +2,7 @@ use self::point::{Counter, Point};
 use crate::{create_progress_bar, find_target_dir, EvaluateError};
 use aberth::{AberthSolver, Complex};
 use indicatif::ProgressBar;
+use integer_encoding::VarIntWriter;
 use nalgebra::{DMatrix, Dyn, OVector};
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sled::{Batch, Db, IVec};
@@ -12,7 +13,6 @@ use std::{
     iter::FromIterator,
     ops::Add,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
 };
 use wolfram_wxf::{ToWolfram, WolframValue};
 
