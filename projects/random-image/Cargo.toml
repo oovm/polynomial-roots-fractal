@@ -1,0 +1,20 @@
+[package]
+name = "random-image"
+publish = false
+version = "0.0.0"
+authors = ["Aster <192607617@qq.com>"]
+description = "E"
+repository = "..."
+readme = "../../Readme.md"
+license = "MPL-2.0"
+edition = "2018"
+
+[dependencies]
+rand = "0.8.5"
+image = "0.24.7"
+
+
+[dev-dependencies]
+
+[features]
+default = []
