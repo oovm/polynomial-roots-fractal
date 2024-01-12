@@ -5,7 +5,6 @@ use std::{
     ops::RangeInclusive,
     path::{Path, PathBuf},
 };
-
 pub fn copy_vec_ref<T: Copy>(vec: Vec<&T>) -> Vec<T> {
     vec.into_iter().copied().collect()
 }

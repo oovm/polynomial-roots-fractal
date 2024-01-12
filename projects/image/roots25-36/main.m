@@ -3,30 +3,45 @@
 SetDirectory@NotebookDirectory[];
 
 
-Options[draw] = {
-	Quantile -> 0.975
-};
-draw[data_, canvas_, o : OptionsPattern[]] := Block[
-	{l = ConstantArray[0., {canvas + 1, canvas + 1}], cutted, plot},
-	l[[#, #2]] += 1.& @@@ Round[1 + canvas * Rescale@data];
-	cutted = Quantile[DeleteCases[Flatten[l], 0.], OptionValue[Quantile]];
-	plot = ArrayPlot[UnitStep[cutted - l]l, ColorFunction -> "AvocadoColors", Frame -> False];
-	ImageRotate[ImagePad[plot, -20], Pi / 2]
+loadData[i_]:=extend/@Normal@Import["C:\\Users\\Dell\\CLionProjects\\polynomial-roots-fractal\\target\\PolynomialRoots\\littlewood\\complex_"<>ToString[i]<>".wxf"];
+extend[Complex[a_,b_]]:=If[a>4||b>4, Nothing,{a +b I ,a-b  I, -a +b I , -a-b I}];
+With[
+{\[Gamma] = 0.12, \[Beta] = 1.},
+     fLor = Compile[{{x, _Integer}, {y, _Integer}},(\[Gamma]/(\[Gamma] + x^2 + y^2))^\[Beta], RuntimeAttributes -> {Listable}]
 ];
 
-
-gif[i_, j_] := ImageResize[draw[Import["polynomial_roots_" <> ToString[i] <> ".wxf"], j], 200];
-
-Export["roots.gif",
-	{
-		gif[2, 100],
-		gif[3, 100],
-		gif[4, 100],
-		gif[5, 100],
-		gif[6, 200],
-		gif[7, 200],
-		gif[8, 200],
-		gif[9, 200]
-	},
-	"DisplayDurations" -> ConstantArray[1, 8]
+PlotComplexPoints[list_, magnification_, paddingX_, paddingY_, brightness_, vec_] := Module[
+    {dimX, dimY, RePos, ImPos, lor, posf, sparse},
+           posf = 1 + Round[magnification (# - Min[#])] &;
+           RePos = paddingX + posf[Re[list]]; ImPos = paddingY + posf[Im[list]];
+           dimX = paddingX + Max[RePos]; dimY = paddingY + Max[ImPos];
+           With[
+    {spopt = SystemOptions["SparseArrayOptions"]},
+                Internal`WithLocalSettings[
+                SetSystemOptions["SparseArrayOptions" -> {"TreatRepeatedEntries" -> 1}],
+                Image[Outer[Times,
+                            brightness Abs[InverseFourier[Fourier[
+                            SparseArray[Thread[Transpose[{ImPos, RePos}] -> 
+                                        ConstantArray[1, Length[list]]], {dimY, dimX}]]
+                            Fourier[RotateRight[fLor[#[[All, All, 1]],
+                                                     #[[All, All, 2]]] & @
+                                    Outer[List,
+Range[-Quotient[dimY, 2],Quotient[dimY - 1, 2]], 
+                                          Range[-Quotient[dimX, 2], Quotient[dimX - 1, 2]]],
+                                          {Quotient[dimY, 2], Quotient[dimX, 2]}]],
+                                    FourierParameters -> {-1, 1}]
+], 
+                            Developer`ToPackedArray[N[vec]]], Magnification -> 1
+],
+                SetSystemOptions[spopt]
 ]
+]
+]
+
+
+TakeLargest[#,10]&/@Transpose[ReIm/@Normal@Import["C:\\Users\\Dell\\CLionProjects\\polynomial-roots-fractal\\target\\PolynomialRoots\\littlewood\\complex_20.wxf"]]
+
+
+data=Flatten@Table[loadData[i],{i,17}];
+image=PlotComplexPoints[data,5000, 20, 20, 4, {0.1, 0.3, 0.9}];
+Export["image.png",image]

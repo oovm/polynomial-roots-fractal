@@ -3,13 +3,15 @@ name = "polynomial-roots"
 publish = false
 version = "0.0.0"
 authors = ["Aster <192607617@qq.com>"]
-description = "..."
+description = "E"
 repository = "..."
 readme = "../../Readme.md"
 license = "MPL-2.0"
 edition = "2018"
 
 [dependencies]
+rand = "0.8.5"
+image = "0.24.7"
 ndarray = "0.15.6"
 nalgebra = "0.32.3"
 itertools = "0.12.0"
